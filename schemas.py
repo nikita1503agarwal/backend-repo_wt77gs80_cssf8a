@@ -1,48 +1,97 @@
 """
-Database Schemas
+Database Schemas for Mental Health Platform
 
-Define your MongoDB collection schemas here using Pydantic models.
-These schemas are used for data validation in your application.
+Each Pydantic model represents a MongoDB collection. Collection name is the lowercased class name.
 
-Each Pydantic model represents a collection in your database.
-Model name is converted to lowercase for the collection name:
-- User -> "user" collection
-- Product -> "product" collection
-- BlogPost -> "blogs" collection
+Key collections:
+- User (roles: parent, doctor, hospital_admin, super_admin)
+- Hospital
+- Doctor
+- Assessment
+- Appointment
+- TherapyPlan
+- Message (for live support/chat)
+- Testimonial
 """
 
-from pydantic import BaseModel, Field
-from typing import Optional
+from pydantic import BaseModel, Field, EmailStr
+from typing import Optional, List, Literal, Dict
+from datetime import datetime
 
-# Example schemas (replace with your own):
+Role = Literal["parent", "doctor", "hospital_admin", "super_admin"]
 
 class User(BaseModel):
-    """
-    Users collection schema
-    Collection name: "user" (lowercase of class name)
-    """
-    name: str = Field(..., description="Full name")
-    email: str = Field(..., description="Email address")
-    address: str = Field(..., description="Address")
-    age: Optional[int] = Field(None, ge=0, le=120, description="Age in years")
-    is_active: bool = Field(True, description="Whether user is active")
+    name: str
+    email: EmailStr
+    role: Role
+    password_hash: str
+    verified: bool = False
+    language: Optional[str] = "en"
 
-class Product(BaseModel):
-    """
-    Products collection schema
-    Collection name: "product" (lowercase of class name)
-    """
-    title: str = Field(..., description="Product title")
-    description: Optional[str] = Field(None, description="Product description")
-    price: float = Field(..., ge=0, description="Price in dollars")
-    category: str = Field(..., description="Product category")
-    in_stock: bool = Field(True, description="Whether product is in stock")
+class Hospital(BaseModel):
+    name: str
+    location: str
+    specialization: Optional[List[str]] = []
+    contact_email: Optional[EmailStr] = None
+    contact_phone: Optional[str] = None
+    description: Optional[str] = None
+    services: Optional[List[str]] = []
 
-# Add your own schemas here:
-# --------------------------------------------------
+class Doctor(BaseModel):
+    user_id: str
+    hospital_id: str
+    specialization: List[str]
+    experience_years: int = Field(ge=0, default=0)
+    qualifications: Optional[List[str]] = []
+    languages: Optional[List[str]] = ["en"]
+    bio: Optional[str] = None
+    photo_url: Optional[str] = None
+    verified: bool = False
+    ratings: Optional[List[int]] = []
 
-# Note: The Flames database viewer will automatically:
-# 1. Read these schemas from GET /schema endpoint
-# 2. Use them for document validation when creating/editing
-# 3. Handle all database operations (CRUD) directly
-# 4. You don't need to create any database endpoints!
+class Assessment(BaseModel):
+    parent_id: str
+    child_name: str
+    child_age: int = Field(ge=0, le=18)
+    age_group: Literal["infant", "child", "adolescent"]
+    condition: Literal["autism", "adhd", "dyslexia", "other"]
+    responses: Dict[str, str]
+    voice_transcript: Optional[str] = None
+    language: Optional[str] = "en"
+    encrypted: bool = True
+    risk_score: Optional[float] = None
+    assigned_doctor_id: Optional[str] = None
+    assigned_hospital_id: Optional[str] = None
+    status: Literal["submitted", "assigned", "in_review", "completed"] = "submitted"
+
+class Appointment(BaseModel):
+    parent_id: str
+    doctor_id: str
+    hospital_id: str
+    assessment_id: Optional[str] = None
+    mode: Literal["online", "in_person"] = "online"
+    slot: str  # ISO datetime string
+    period: Literal["morning", "afternoon", "evening"]
+    status: Literal["pending", "confirmed", "cancelled", "completed"] = "pending"
+    payment_status: Literal["unpaid", "paid", "refunded"] = "unpaid"
+    payment_provider: Optional[Literal["stripe", "razorpay"]] = None
+    notes: Optional[str] = None
+
+class TherapyPlan(BaseModel):
+    doctor_id: str
+    parent_id: str
+    assessment_id: str
+    suggestions: List[str] = []  # OT/ST/BT suggestions
+    approved: bool = False
+
+class Message(BaseModel):
+    from_user_id: str
+    to_user_id: str
+    content: str
+    created_at: Optional[datetime] = None
+
+class Testimonial(BaseModel):
+    doctor_id: str
+    parent_id: str
+    rating: int = Field(ge=1, le=5)
+    comment: Optional[str] = None
